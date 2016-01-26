@@ -13,7 +13,7 @@ function unzip_file($file, $destination) {
 	// Afficher un message de fin
 	echo 'Archive extrait';
 }
- 
+    
 // Exemple d'utilisation
 unzip_file('test.zip', '/test/');
 ?>
