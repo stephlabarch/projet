@@ -6,7 +6,6 @@
     
 	<?php  
         include "connect.php";
-        //connect_bdd();
         echo 'projet_tut : <br>';
         echo 'test <br>';    
         
@@ -40,8 +39,31 @@
             return ($chsansaccent);
         }
         
+        function mot_rejete($mot)
+        {
+            require 'connect.php';
+            $sql = 'SELECT count(*) from rejet where libelle='.$pdo->quote($mot);
+            $req = $pdo->query($sql);
+            while($row = $req->fetch())
+            {
+                return $row[0];
+            }    
+            $req->CloseCursor();
+        }
         
+        function present_occur($mot1)
+        {
+            require 'connect.php';
+            $sql1 = 'SELECT count(*) from occurence where mot='.$pdo->quote($mot1);
+            $req1 = $pdo->query($sql1);
+            while($row = $req1->fetch())
+            {
+                return $row[0];
+            }    
+            $req->CloseCursor();
+        }
         
+       
         function extraire($nom)
         {
            $fic=fopen($nom,"r");
@@ -54,25 +76,49 @@
                {
                     if (strcmp($tab[$i],"-->") !== 0)
                     {
-                        if (!ctype_digit("$tab[$i]"))
+                        if (!ctype_digit("$tab[$i]"))/*verifie qu'une chaine est un entier*/
                         {
                             if (strlen($tab[$i]) > 1)
                             {
-                                if ( substr_count($tab[$i],"00:0") == 0 )
+                                if ( substr_count($tab[$i],"00:") == 0 )
                                 {
+                                    while ( strpos($tab[$i],"'") !== false)/*verifiez pour des mots comme aujourd'hui*/
+                                    {
+                                        $tab[$i]=substr($tab[$i],1);
+                                    }
                                     $chaine=$tab[$i];
                                     $newch=sans_accent($chaine);//supprime les accents ou caractere spécial
                                     $ch=strtolower($newch);//met la chaine en minuscule
-                                    $connexion=connect_bdd();
-                                    if (!$connexion)
+                                    $rej=mot_rejete($ch);
+                                    if($rej==0)
                                     {
-                                        echo ("connexion a la base impossible");
+                                        $presence=present_occur($ch);
+                                        if ($presence == 0)
+                                        { 
+                                            require 'connect.php';
+                                            echo "-$ch- n'est pas dans la table occurence<br>";
+                                            $req = $pdo->prepare("insert into occurence values (:mot,:occur)");
+                                            $req->bindParam(':mot',$ch);
+                                            $req->bindParam(':occur',$occ);
+                                            $occ=1;
+                                            $req->execute();
+                                        }               
+                                        else
+                                        {
+                                            require 'connect.php';
+                                            echo "-$ch- est deja dans la table occurence<br>";
+                                            $req1=$pdo->prepare('update occurence set nbo=nbo+1 where mot='.$pdo->quote($ch));
+                                            $reussite=$req1->execute();
+                                            if($reussite)
+                                            {
+                                                echo "update reussi<br>";
+                                            }
+                                            else
+                                            {
+                                                echo "update rate<br>";
+                                            }
+                                        }
                                     }
-                                    $req="select * from mot_bannis";
-                                    if( $resultat = mysqli_query($lien,"$req") )
-                                            
-                                    echo $ch;
-                                    echo "</br>";
                                 }
                             }
                         }
@@ -84,6 +130,7 @@
     
         function list_dir($name, $level=0) //parcours d'arborescence
         {
+            set_time_limit(0);
             if ($dir=opendir($name)) 
             {
                 while($fichier = readdir($dir)) 
